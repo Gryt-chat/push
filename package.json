@@ -1,0 +1,32 @@
+{
+  "name": "push",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Gryt's push relay: opaque capabilities in, APNs and FCM out.",
+  "license": "AGPL-3.0-or-later",
+  "type": "module",
+  "engines": {
+    "node": ">=22.13"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Gryt-chat/push.git"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "node --watch --experimental-strip-types src/index.ts",
+    "start": "node dist/index.js",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src",
+    "test": "node --test --experimental-strip-types \"src/**/*.test.ts\"",
+    "test:comment-length": "node scripts/check-comment-length.mjs"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.2",
+    "@types/node": "^22.20.1",
+    "eslint": "^9.39.2",
+    "globals": "^17.11.0",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.56.0"
+  }
+}

@@ -1,0 +1,14 @@
+node_modules/
+dist/
+dist-ui/
+*.log
+
+# Device tokens, keyed by capability hash.
+data/
+
+# Environment
+.env
+.env.*
+!.env.example
+.DS_Store
+*.tsbuildinfo
