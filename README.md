@@ -15,8 +15,9 @@ phone each random ID belongs to.
    to deliver it.
 
 The relay doesn't know who you are, which servers you use, or what anybody wrote.
-The notification text is fixed here, so a server can't put anything in it.
-It says "Someone mentioned you", "New direct message" or "New message".
+The text the relay writes is fixed: "Someone mentioned you", "New direct message" or
+"New message". A server can add a preview, but it's sealed to the phone, so only the
+phone can read it and the relay just passes it along.
 Tapping it opens that server in the app, and the messages load from there.
 
 Capabilities are stored as SHA-256 hashes. A copy of the database has device tokens
@@ -27,11 +28,16 @@ in it but nothing that can make a phone ring.
 ```
 POST   /v1/devices   {"platform": "ios"|"android", "token": "...", "env": "production"|"sandbox"}
                      → 201 {"capability": "p_..."}
-POST   /v1/push      Authorization: Bearer p_...   {"kind": "mention"|"dm"|"message"}
+POST   /v1/push      Authorization: Bearer p_...   {"kind": "mention"|"dm"|"message", "preview"?: "..."}
                      → 202, or 404 unknown, 410 the phone is gone, 429, 502
 DELETE /v1/push      Authorization: Bearer p_...   → 204 or 404
 GET    /healthz
 ```
+
+A push can also carry `"preview"`: who wrote, where and the first line, sealed by the
+server to a key only the phone has (AES-256-GCM, base64url). The relay checks its shape,
+passes it on unread, and still sends its own fixed text. On iOS a notification extension
+in the app opens the preview and shows it instead. If it can't, the fixed text stays.
 
 A 410 means Apple or Google said the token is dead. The relay has already forgotten
 it, and the server should forget the capability too.
