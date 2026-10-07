@@ -4,6 +4,8 @@ import { readFileSync } from "node:fs";
 export interface Config {
   host: string;
   port: number;
+  /** Prometheus and daily totals. 0 leaves it off; never publish it. */
+  metricsPort: number;
   dataDir: string;
   version: string;
   trustProxy: boolean;
@@ -76,6 +78,7 @@ export function loadConfig(env: Env = process.env): Config {
   return {
     host: env.HOST || "0.0.0.0",
     port: int(env, "PORT", 8080),
+    metricsPort: int(env, "METRICS_PORT", 0),
     dataDir: env.DATA_DIR || "./data",
     version: env.PUSH_VERSION || "dev",
     trustProxy: env.TRUST_PROXY === "true",

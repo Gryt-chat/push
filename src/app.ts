@@ -49,6 +49,7 @@ export function createHandler(config: Config, store: Store, senders: Senders, lo
 
     const cap = newCapability();
     store.add(hashCapability(cap), { platform, token: body.token, env }, clock());
+    store.bump("registered", platform, "", clock());
     sendJson(res, 201, { capability: cap });
   }
 
@@ -73,14 +74,17 @@ export function createHandler(config: Config, store: Store, senders: Senders, lo
 
     if (result.ok) {
       store.touch(capHash, now);
+      store.bump("sent", device.platform, kind, now);
       return sendJson(res, 202, { ok: true });
     }
     if (result.gone) {
       // Every server holding a capability for this phone learns it on its next push.
       store.removeToken(device.token);
+      store.bump("gone", device.platform, "", now);
       log.info(`dropped a dead ${device.platform} token: ${result.reason}`);
       throw new HttpError(410, "gone");
     }
+    store.bump("failed", device.platform, "", now);
     log.warn(`push failed: ${result.reason}`);
     throw new HttpError(502, "upstream_failed");
   }

@@ -5,6 +5,17 @@ import { DatabaseSync } from "node:sqlite";
 export type Platform = "ios" | "android";
 export type ApnsEnv = "production" | "sandbox";
 
+/** What the relay counts. Per day, platform and kind, and never per device. */
+export type Event = "registered" | "sent" | "gone" | "failed";
+
+export interface DailyCount {
+  day: string;
+  event: Event;
+  platform: Platform;
+  kind: string;
+  n: number;
+}
+
 export interface Device {
   platform: Platform;
   token: string;
@@ -30,6 +41,17 @@ export class Store {
         env          TEXT NOT NULL,
         created_at   INTEGER NOT NULL,
         last_used_at INTEGER NOT NULL
+      )
+    `);
+    // Kept apart from devices, so the totals outlive every device that made them.
+    this.db.exec(`
+      CREATE TABLE IF NOT EXISTS daily_counts (
+        day      TEXT NOT NULL,
+        event    TEXT NOT NULL,
+        platform TEXT NOT NULL,
+        kind     TEXT NOT NULL,
+        n        INTEGER NOT NULL,
+        PRIMARY KEY (day, event, platform, kind)
       )
     `);
   }
@@ -67,6 +89,38 @@ export class Store {
 
   pruneIdle(before: number): number {
     return Number(this.db.prepare("DELETE FROM devices WHERE last_used_at < ?").run(before).changes);
+  }
+
+  /** `kind` is the push kind for `sent`, and empty for the rest. Days are UTC. */
+  bump(event: Event, platform: Platform, kind: string, now: number): void {
+    this.db
+      .prepare(
+        "INSERT INTO daily_counts (day, event, platform, kind, n) VALUES (?, ?, ?, ?, 1) " +
+          "ON CONFLICT (day, event, platform, kind) DO UPDATE SET n = n + 1",
+      )
+      .run(new Date(now).toISOString().slice(0, 10), event, platform, kind);
+  }
+
+  /** Every count since `fromDay` (YYYY-MM-DD), oldest first. */
+  daily(fromDay: string): DailyCount[] {
+    return this.db
+      .prepare("SELECT day, event, platform, kind, n FROM daily_counts WHERE day >= ? ORDER BY day, event, platform, kind")
+      .all(fromDay) as unknown as DailyCount[];
+  }
+
+  /** All-time sums, so a counter read from them never goes backwards across a restart. */
+  totals(): Omit<DailyCount, "day">[] {
+    return this.db
+      .prepare("SELECT event, platform, kind, SUM(n) AS n FROM daily_counts GROUP BY event, platform, kind ORDER BY event, platform, kind")
+      .all() as unknown as Omit<DailyCount, "day">[];
+  }
+
+  devicesByPlatform(): Record<Platform, number> {
+    const out: Record<Platform, number> = { ios: 0, android: 0 };
+    for (const row of this.db.prepare("SELECT platform, COUNT(*) AS n FROM devices GROUP BY platform").all() as { platform: Platform; n: number }[]) {
+      out[row.platform] = Number(row.n);
+    }
+    return out;
   }
 
   count(): number {
