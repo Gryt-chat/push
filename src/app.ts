@@ -5,7 +5,7 @@ import type { Config } from "./config.ts";
 import type { ApnsEnv, Platform, Store } from "./db.ts";
 import { clientIp, header, HttpError, readJson, sendJson } from "./http.ts";
 import { RateLimiter } from "./limits.ts";
-import { alertFor, KINDS, type Alert, type Kind, type SendResult } from "./notification.ts";
+import { alertFor, KINDS, PREVIEW_SHAPE, type Alert, type Kind, type SendResult } from "./notification.ts";
 
 export interface Senders {
   ios?: (token: string, env: ApnsEnv, alert: Alert) => Promise<SendResult>;
@@ -58,6 +58,8 @@ export function createHandler(config: Config, store: Store, senders: Senders, lo
     const body = await readJson(req, MAX_BODY);
     const kind = body.kind as Kind;
     if (!KINDS.includes(kind)) throw new HttpError(400, "bad_kind");
+    const preview = body.preview;
+    if (preview !== undefined && (typeof preview !== "string" || !PREVIEW_SHAPE.test(preview))) throw new HttpError(400, "bad_preview");
 
     const now = clock();
     if (!perIp.take(ip, now)) throw new HttpError(429, "too_many_pushes");
@@ -66,7 +68,7 @@ export function createHandler(config: Config, store: Store, senders: Senders, lo
     if (!device) throw new HttpError(404, "unknown_capability");
     if (!perDevice.take(capHash, now)) throw new HttpError(429, "too_many_pushes");
 
-    const alert = alertFor(kind, capabilityTag(cap));
+    const alert = alertFor(kind, capabilityTag(cap), preview as string | undefined);
     const result = device.platform === "ios"
       ? await senders.ios?.(device.token, device.env, alert)
       : await senders.android?.(device.token, alert);

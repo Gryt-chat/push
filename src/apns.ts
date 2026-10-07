@@ -30,8 +30,11 @@ export function apnsPayload(alert: Alert): string {
       alert: { title: alert.title, body: alert.body },
       sound: "default",
       "thread-id": alert.tag,
+      // Wakes the phone's notification extension, which swaps in the decrypted preview.
+      ...(alert.preview ? { "mutable-content": 1 } : {}),
     },
     c: alert.tag,
+    ...(alert.preview ? { p: alert.preview } : {}),
   });
 }
 

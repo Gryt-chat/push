@@ -3,7 +3,9 @@ import { createServer, type Server } from "node:http";
 import type { AddressInfo } from "node:net";
 import { afterEach, beforeEach, describe, it } from "node:test";
 
+import { apnsPayload } from "./apns.ts";
 import { createHandler, type Senders } from "./app.ts";
+import { fcmMessage } from "./fcm.ts";
 import { capabilityTag, hashCapability } from "./caps.ts";
 import { loadConfig } from "./config.ts";
 import { Store } from "./db.ts";
@@ -68,6 +70,35 @@ describe("push relay", () => {
     assert.deepEqual(sent, [
       { platform: "ios", token: IOS_TOKEN, env: "sandbox", alert: { title: "Gryt", body: "Someone mentioned you", tag: capabilityTag(cap) } },
     ]);
+  });
+
+  it("passes a sealed preview through unread, and asks iOS to wake the extension", async () => {
+    const cap = await register();
+    const preview = "AQ" + "x".repeat(60);
+    const res = await post("/v1/push", { kind: "message", preview }, cap);
+    assert.equal(res.status, 202);
+    assert.equal(sent[0].alert.preview, preview);
+    assert.equal(sent[0].alert.body, "New message", "the fixed text is still there for when the extension can't open it");
+    const apns = JSON.parse(apnsPayload(sent[0].alert));
+    assert.equal(apns.aps["mutable-content"], 1);
+    assert.equal(apns.p, preview);
+    assert.equal((fcmMessage("t", sent[0].alert) as { message: { data: { p: string } } }).message.data.p, preview);
+  });
+
+  it("leaves a push without a preview exactly as it was", async () => {
+    const cap = await register();
+    await post("/v1/push", { kind: "dm" }, cap);
+    assert.equal(sent[0].alert.preview, undefined);
+    assert.ok(!("mutable-content" in JSON.parse(apnsPayload(sent[0].alert)).aps));
+  });
+
+  it("refuses a preview that isn't the shape the server writes", async () => {
+    const cap = await register();
+    for (const preview of [42, "short", "has spaces in it and is long enough to pass the length check", "x".repeat(2049)]) {
+      const res = await post("/v1/push", { kind: "dm", preview }, cap);
+      assert.equal(res.status, 400, JSON.stringify(preview).slice(0, 30));
+    }
+    assert.equal(sent.length, 0);
   });
 
   it("stores a hash of the capability, never the capability", async () => {

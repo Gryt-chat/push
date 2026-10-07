@@ -21,7 +21,7 @@ export function fcmMessage(deviceToken: string, alert: Alert): object {
       token: deviceToken,
       notification: { title: alert.title, body: alert.body },
       android: { priority: "high", notification: { channel_id: "messages", sound: "default" } },
-      data: { c: alert.tag },
+      data: { c: alert.tag, ...(alert.preview ? { p: alert.preview } : {}) },
     },
   };
 }
