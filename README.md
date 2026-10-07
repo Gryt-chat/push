@@ -42,6 +42,22 @@ it, and the server should forget the capability too.
 minute per server address, and 60 registrations an hour per address. A capability
 nobody has pushed to in 120 days is dropped. All of these are in `.env.example`.
 
+## Counting
+
+The relay keeps a count per UTC day of pushes sent, by platform and kind, and of
+registrations and dead tokens. Nothing in it is per device or per server, so it can
+say "4,210 pushes on Tuesday" and nothing about who got them. The counts sit in their
+own table and stay when the devices that made them are forgotten.
+
+Set `METRICS_PORT` and the relay serves them on a second port:
+
+```
+GET /metrics          Prometheus counters, plus how many devices it holds now
+GET /stats?days=30    the daily counts as JSON
+```
+
+Don't publish that port. It's for your Prometheus and for you.
+
 ## Running it
 
 ```bash

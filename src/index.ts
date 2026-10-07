@@ -5,6 +5,7 @@ import { createHandler, type Senders } from "./app.ts";
 import { loadConfig } from "./config.ts";
 import { Store } from "./db.ts";
 import { FcmSender } from "./fcm.ts";
+import { createMetricsHandler } from "./metrics.ts";
 
 const DAY = 24 * 60 * 60_000;
 const log = {
@@ -43,8 +44,12 @@ server.listen(config.port, config.host, () => {
   log.info(`push ${config.version} on ${config.host}:${config.port}, platforms: ${platforms}, devices: ${store.count()}`);
 });
 
+const metrics = config.metricsPort ? createServer(createMetricsHandler(store)) : null;
+metrics?.listen(config.metricsPort, config.host, () => log.info(`metrics on ${config.host}:${config.metricsPort}`));
+
 function shutdown(): void {
   server.close();
+  metrics?.close();
   apns?.close();
   store.db.close();
 }
