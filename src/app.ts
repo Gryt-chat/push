@@ -9,7 +9,7 @@ import { alertFor, KINDS, PREVIEW_SHAPE, type Alert, type Kind, type SendResult 
 
 export interface Senders {
   ios?: (token: string, env: ApnsEnv, alert: Alert) => Promise<SendResult>;
-  android?: (token: string, alert: Alert) => Promise<SendResult>;
+  android?: (token: string, alert: Alert, opens: boolean) => Promise<SendResult>;
 }
 
 const MAX_BODY = 8 * 1024;
@@ -48,7 +48,8 @@ export function createHandler(config: Config, store: Store, senders: Senders, lo
     if (!registrations.take(ip, clock())) throw new HttpError(429, "too_many_registrations");
 
     const cap = newCapability();
-    store.add(hashCapability(cap), { platform, token: body.token, env }, clock());
+    const opens = platform === "android" && body.opens === true;
+    store.add(hashCapability(cap), { platform, token: body.token, env, opens }, clock());
     store.bump("registered", platform, "", clock());
     sendJson(res, 201, { capability: cap });
   }
@@ -71,7 +72,7 @@ export function createHandler(config: Config, store: Store, senders: Senders, lo
     const alert = alertFor(kind, capabilityTag(cap), preview as string | undefined);
     const result = device.platform === "ios"
       ? await senders.ios?.(device.token, device.env, alert)
-      : await senders.android?.(device.token, alert);
+      : await senders.android?.(device.token, alert, device.opens === true);
     if (!result) throw new HttpError(503, `${device.platform}_unavailable`);
 
     if (result.ok) {

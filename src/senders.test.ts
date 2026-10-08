@@ -91,8 +91,8 @@ describe("FCM", () => {
     }) as unknown as typeof fetch;
 
     const fcm = new FcmSender(config, fakeFetch, "https://google.test/token", "https://fcm.test");
-    assert.deepEqual(await fcm.send("tok", alert, 1_000_000), { ok: true });
-    assert.deepEqual(await fcm.send("tok", alert, 1_000_500), { ok: true });
+    assert.deepEqual(await fcm.send("tok", alert, false, 1_000_000), { ok: true });
+    assert.deepEqual(await fcm.send("tok", alert, false, 1_000_500), { ok: true });
     assert.equal(calls.filter((c) => c.url.endsWith("/token")).length, 1);
 
     const assertion = new URLSearchParams(String(calls[0].init.body)).get("assertion")!;
