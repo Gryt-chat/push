@@ -35,7 +35,7 @@ async function start(env: Record<string, string> = {}, senders?: Senders) {
   const config = loadConfig({ PORT: "0", ...env });
   const fake: Senders = senders ?? {
     ios: async (token, apnsEnv, alert) => (sent.push({ platform: "ios", token, env: apnsEnv, alert }), next),
-    android: async (token, alert) => (sent.push({ platform: "android", token, alert }), next),
+    android: async (token, alert, opens) => (sent.push({ platform: "android", token, alert, opens }), next),
   };
   const { handle } = createHandler(config, store, fake, quiet);
   server = createServer((req, res) => void handle(req, res));
@@ -51,8 +51,8 @@ function post(path: string, body: unknown, cap?: string) {
   });
 }
 
-async function register(platform = "ios", token = IOS_TOKEN, env?: string): Promise<string> {
-  const res = await post("/v1/devices", { platform, token, env });
+async function register(platform = "ios", token = IOS_TOKEN, env?: string, opens?: boolean): Promise<string> {
+  const res = await post("/v1/devices", { platform, token, env, opens });
   assert.equal(res.status, 201);
   return ((await res.json()) as { capability: string }).capability;
 }
@@ -121,6 +121,30 @@ describe("push relay", () => {
     assert.equal((await post("/v1/push", { kind: "dm" }, cap)).status, 202);
     assert.equal(sent[0].platform, "android");
     assert.equal(sent[0].alert.body, "New direct message");
+  });
+
+  it("sends a data-only message to an android app that opens previews itself", async () => {
+    const preview = "AQ" + "x".repeat(60);
+    const opener = await register("android", FCM_TOKEN, undefined, true);
+    await post("/v1/push", { kind: "message", preview }, opener);
+    assert.equal(sent[0].opens, true);
+    const message = (fcmMessage("t", sent[0].alert, true) as { message: Record<string, unknown> }).message;
+    assert.ok(!("notification" in message), "Android would show the fixed text itself and never wake the app");
+    assert.deepEqual(message.data, { c: sent[0].alert.tag, p: preview, t: "Gryt", b: "New message" });
+  });
+
+  it("keeps the shown notification for an older android app, and for a push with no preview", async () => {
+    const older = await register("android", FCM_TOKEN);
+    await post("/v1/push", { kind: "message", preview: "AQ" + "x".repeat(60) }, older);
+    assert.equal(sent[0].opens, false);
+    assert.ok("notification" in (fcmMessage("t", sent[0].alert, false) as { message: object }).message);
+    const bare = { title: "Gryt", body: "New message", tag: "0123456789abcdef" };
+    assert.ok("notification" in (fcmMessage("t", bare, true) as { message: object }).message);
+  });
+
+  it("ignores opens on iOS, where the extension does the opening", async () => {
+    const cap = await register("ios", IOS_TOKEN, undefined, true);
+    assert.equal(store.get(hashCapability(cap))?.opens, false);
   });
 
   it("refuses bad platforms, tokens and kinds", async () => {

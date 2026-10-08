@@ -21,7 +21,7 @@ const apns = config.apns ? new ApnsSender(config.apns) : null;
 if (apns) senders.ios = (token, env, alert) => apns.send(token, env, alert);
 if (config.fcm) {
   const fcm = new FcmSender(config.fcm);
-  senders.android = (token, alert) => fcm.send(token, alert);
+  senders.android = (token, alert, opens) => fcm.send(token, alert, opens);
 }
 
 const { handle, prune } = createHandler(config, store, senders, log);

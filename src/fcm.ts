@@ -15,7 +15,17 @@ export function fcmAssertion(config: FcmConfig, key: KeyObject, nowSec: number):
   return `${body}.${sign("sha256", Buffer.from(body), key).toString("base64url")}`;
 }
 
-export function fcmMessage(deviceToken: string, alert: Alert): object {
+export function fcmMessage(deviceToken: string, alert: Alert, opens = false): object {
+  // Data-only, so Android hands it to the app to open instead of showing the fixed text itself.
+  if (opens && alert.preview) {
+    return {
+      message: {
+        token: deviceToken,
+        android: { priority: "high" },
+        data: { c: alert.tag, p: alert.preview, t: alert.title, b: alert.body },
+      },
+    };
+  }
   return {
     message: {
       token: deviceToken,
@@ -71,12 +81,12 @@ export class FcmSender {
     return this.access.value;
   }
 
-  async send(deviceToken: string, alert: Alert, now = Date.now()): Promise<SendResult> {
+  async send(deviceToken: string, alert: Alert, opens = false, now = Date.now()): Promise<SendResult> {
     try {
       const res = await this.fetchImpl(`${this.sendOrigin}/v1/projects/${this.config.projectId}/messages:send`, {
         method: "POST",
         headers: { authorization: `Bearer ${await this.accessToken(now)}`, "content-type": "application/json" },
-        body: JSON.stringify(fcmMessage(deviceToken, alert)),
+        body: JSON.stringify(fcmMessage(deviceToken, alert, opens)),
         signal: AbortSignal.timeout(TIMEOUT_MS),
       });
       if (res.ok) return { ok: true };

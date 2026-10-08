@@ -20,6 +20,8 @@ export interface Device {
   platform: Platform;
   token: string;
   env: ApnsEnv;
+  /** An Android app that opens sealed previews itself, so it's sent data-only messages (GRYT-1698). */
+  opens?: boolean;
 }
 
 /**
@@ -43,6 +45,9 @@ export class Store {
         last_used_at INTEGER NOT NULL
       )
     `);
+    // Added after the table shipped, so an existing push.db gets the column here.
+    const columns = this.db.prepare("PRAGMA table_info(devices)").all() as { name: string }[];
+    if (!columns.some((c) => c.name === "opens")) this.db.exec("ALTER TABLE devices ADD COLUMN opens INTEGER NOT NULL DEFAULT 0");
     // Kept apart from devices, so the totals outlive every device that made them.
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS daily_counts (
@@ -63,15 +68,15 @@ export class Store {
 
   add(capHash: string, device: Device, now: number): void {
     this.db
-      .prepare("INSERT INTO devices (cap_hash, platform, token, env, created_at, last_used_at) VALUES (?, ?, ?, ?, ?, ?)")
-      .run(capHash, device.platform, device.token, device.env, now, now);
+      .prepare("INSERT INTO devices (cap_hash, platform, token, env, opens, created_at, last_used_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+      .run(capHash, device.platform, device.token, device.env, device.opens ? 1 : 0, now, now);
   }
 
   get(capHash: string): Device | null {
-    const row = this.db.prepare("SELECT platform, token, env FROM devices WHERE cap_hash = ?").get(capHash) as
-      | { platform: Platform; token: string; env: ApnsEnv }
+    const row = this.db.prepare("SELECT platform, token, env, opens FROM devices WHERE cap_hash = ?").get(capHash) as
+      | { platform: Platform; token: string; env: ApnsEnv; opens: number }
       | undefined;
-    return row ? { platform: row.platform, token: row.token, env: row.env } : null;
+    return row ? { platform: row.platform, token: row.token, env: row.env, opens: row.opens === 1 } : null;
   }
 
   touch(capHash: string, now: number): void {
