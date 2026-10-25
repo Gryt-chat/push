@@ -72,6 +72,12 @@ describe("push relay", () => {
     ]);
   });
 
+  it("pushes a device approval request with its own fixed text (GRYT-1886)", async () => {
+    const cap = await register("ios", IOS_TOKEN, "sandbox");
+    assert.equal((await post("/v1/push", { kind: "approve" }, cap)).status, 202);
+    assert.equal(sent[0]?.alert.body, "A device wants to open your messages. Tap to check it's you.");
+  });
+
   it("passes a sealed preview through unread, and asks iOS to wake the extension", async () => {
     const cap = await register();
     const preview = "AQ" + "x".repeat(60);
