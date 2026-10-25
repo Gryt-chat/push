@@ -1,7 +1,7 @@
 /** What a server may ask for. The text is fixed here, so nothing a server sends is shown. */
-export type Kind = "mention" | "dm" | "message";
+export type Kind = "mention" | "dm" | "message" | "approve";
 
-export const KINDS: readonly Kind[] = ["mention", "dm", "message"];
+export const KINDS: readonly Kind[] = ["mention", "dm", "message", "approve"];
 
 export interface Alert {
   title: string;
@@ -19,6 +19,7 @@ const BODY: Record<Kind, string> = {
   mention: "Someone mentioned you",
   dm: "New direct message",
   message: "New message",
+  approve: "A device wants to open your messages. Tap to check it's you.",
 };
 
 export function alertFor(kind: Kind, tag: string, preview?: string): Alert {
