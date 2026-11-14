@@ -11,12 +11,12 @@ phone each random ID belongs to.
    for a new one for every server it uses.
 3. The phone gives that capability to the server. The server never sees the device token.
 4. When the server wants to wake the phone, it posts the capability and a kind
-   (`mention`, `dm` or `message`). The relay looks up the token and asks APNs or FCM
+   (`mention`, `dm`, `message`, `approve` or `friend`). The relay looks up the token and asks APNs or FCM
    to deliver it.
 
 The relay doesn't know who you are, which servers you use, or what anybody wrote.
-The text the relay writes is fixed: "Someone mentioned you", "New direct message" or
-"New message". A server can add a preview, but it's sealed to the phone, so only the
+The text the relay writes is fixed: "Someone mentioned you", "New direct message",
+"New message" or "New friend request". A server can add a preview, but it's sealed to the phone, so only the
 phone can read it and the relay just passes it along.
 Tapping it opens that server in the app, and the messages load from there.
 
@@ -28,7 +28,7 @@ in it but nothing that can make a phone ring.
 ```
 POST   /v1/devices   {"platform": "ios"|"android", "token": "...", "env": "production"|"sandbox"}
                      → 201 {"capability": "p_..."}
-POST   /v1/push      Authorization: Bearer p_...   {"kind": "mention"|"dm"|"message", "preview"?: "..."}
+POST   /v1/push      Authorization: Bearer p_...   {"kind": "mention"|"dm"|"message"|"approve"|"friend", "preview"?: "..."}
                      → 202, or 404 unknown, 410 the phone is gone, 429, 502
 DELETE /v1/push      Authorization: Bearer p_...   → 204 or 404
 GET    /healthz
