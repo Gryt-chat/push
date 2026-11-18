@@ -24,11 +24,32 @@ jobs:
   docker:
     name: Docker build
     runs-on: ubuntu-latest
+    needs: [check]
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: docker/setup-buildx-action@v3
-      # Not pushed. Only answers whether the image still builds.
+      - if: github.ref == 'refs/heads/main'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: version
+        run: echo "version=$(git describe --tags --always | sed 's/^v//')" >> "$GITHUB_OUTPUT"
+      # A merge publishes :latest, which the deployment's ten-minute refresh pulls (GRYT-2179).
+      # A pull request only builds, so a branch never becomes what the box runs.
       - uses: docker/build-push-action@v6
         with:
           context: .
-          push: false
+          push: ${{ github.ref == 'refs/heads/main' }}
+          platforms: ${{ github.ref == 'refs/heads/main' && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          build-args: PUSH_VERSION=${{ steps.version.outputs.version }}
+          cache-from: type=registry,ref=ghcr.io/gryt-chat/push:buildcache
+          tags: |
+            ghcr.io/gryt-chat/push:latest
+            ghcr.io/gryt-chat/push:${{ github.sha }}
